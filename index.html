@@ -84,11 +84,16 @@ Monthly Top3 - e-certificate
 
 </div>
 
-<script type="module">
-import{initializeApp}from"https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-import{getDatabase,ref,onValue,runTransaction,set,remove}from"https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+<!-- Firebase CDN COMPAT VERSION -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
-const firebaseConfig={
+<script>
+/* =============================
+   FIREBASE INITIALIZATION
+============================= */
+
+const firebaseConfig = {
   apiKey: "AIzaSyBZ5p9HbxcdOZTX9cKpJuboajxqCk5kLkU",
   authDomain: "uno-x-deer-scrim.firebaseapp.com",
   databaseURL: "https://uno-x-deer-scrim-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -97,156 +102,314 @@ const firebaseConfig={
   messagingSenderId: "553694902384",
   appId: "1:553694902384:web:8608acf13b1044b8fadcb5"
 };
-const app=initializeApp(firebaseConfig);
-const db=getDatabase(app);
 
-let isAdmin=false;
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-document.getElementById("date").innerText=
+/* =============================
+   GLOBAL STATE
+============================= */
+
+let isAdmin = false;
+
+const times = [
+"7:00PM","7:30PM","8:00PM","8:30PM","9:00PM",
+"9:30PM","10:00PM","10:30PM","11:00PM","11:30PM"
+];
+
+const container = document.getElementById("container");
+
+/* =============================
+   DATE
+============================= */
+
+document.getElementById("date").innerText =
 new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
 
-const times=["7:00PM","7:30PM","8:00PM","8:30PM","9:00PM","9:30PM","10:00PM","10:30PM","11:00PM","11:30PM"];
-const container=document.getElementById("container");
+/* =============================
+   UI TOGGLE
+============================= */
 
 function toggleList(){
-container.style.display=container.style.display==="block"?"none":"block";
+container.style.display =
+container.style.display === "block" ? "none" : "block";
 }
+window.toggleList = toggleList;
 
-function build(){
-times.forEach(time=>{
-let id=time.replace(":","");
-let html=`<details>
-<summary>${time}
-<span id="count-${id}" style="font-size:.7rem;color:#aaa;">Available:5 | Confirmed:0</span>
-</summary>
-<div id="matches-${id}"></div></details>`;
-container.innerHTML+=html;
-
-let mDiv=document.getElementById(`matches-${id}`);
-for(let i=1;i<=5;i++){
-createMatch(mDiv,id,time,i);
-}
-});
-}
-
-function createMatch(parent,id,time,i){
-let div=document.createElement("div");
-div.className="match-slot";
-div.innerHTML=`
-<div class="vs-row">
-<input id="${id}-${i}-t1" placeholder="Team 1">
-<span>vs</span>
-<input id="${id}-${i}-t2" placeholder="Team 2">
-</div>
-<div class="score-row">
-<select id="s1-${id}-${i}">
-<option value="">-</option><option>2</option><option>1</option><option>0</option><option>DQ</option>
-</select>
--
-<select id="s2-${id}-${i}">
-<option value="">-</option><option>2</option><option>1</option><option>0</option><option>DQ</option>
-</select>
-<button id="ok-${id}-${i}" disabled>OK</button>
-</div>
-<div id="win-${id}-${i}" class="winner-tag"></div>
-<div class="admin-controls" id="admin-${id}-${i}" style="display:none;">
-<button onclick="unlockTeam('${time}',${i})">Unlock Teams</button>
-<button onclick="unlockScore('${time}',${i})">Unlock Score</button>
-</div>
-`;
-parent.appendChild(div);
-
-document.getElementById(`${id}-${i}-t1`).addEventListener("change",e=>saveTeam(time,i,"t1",e.target.value));
-document.getElementById(`${id}-${i}-t2`).addEventListener("change",e=>saveTeam(time,i,"t2",e.target.value));
-
-document.getElementById(`s1-${id}-${i}`).addEventListener("change",()=>checkScore(id,i));
-document.getElementById(`s2-${id}-${i}`).addEventListener("change",()=>checkScore(id,i));
-document.getElementById(`ok-${id}-${i}`).addEventListener("click",()=>lockScore(time,i));
-}
-
-function saveTeam(time,i,pos,name){
-if(!confirm("Confirm team name? After this it locks."))return;
-let path=`scrims/${time.replace(":","")}/${i}/${pos}`;
-runTransaction(ref(db,path),cur=>{
-if(!cur||isAdmin)return name;
-alert("Slot already taken. Refresh.");
-return;
-});
-}
-
-function checkScore(id,i){
-let s1=document.getElementById(`s1-${id}-${i}`).value;
-let s2=document.getElementById(`s2-${id}-${i}`).value;
-document.getElementById(`ok-${id}-${i}`).disabled=(s1===""||s2==="");
-}
-
-function determineWinner(t1,t2,s1,s2){
-if(s1==="DQ")return t2;
-if(s2==="DQ")return t1;
-if(parseInt(s1)>parseInt(s2))return t1;
-if(parseInt(s2)>parseInt(s1))return t2;
-return "Draw";
-}
-
-function lockScore(time,i){
-if(!confirm("Lock score?"))return;
-let id=time.replace(":","");
-let s1=document.getElementById(`s1-${id}-${i}`).value;
-let s2=document.getElementById(`s2-${id}-${i}`).value;
-set(ref(db,`scrims/${id}/${i}/score`),{s1,s2,locked:true});
-}
-
-function unlockTeam(time,i){
-if(!isAdmin)return;
-remove(ref(db,`scrims/${time.replace(":","")}/${i}/t1`));
-remove(ref(db,`scrims/${time.replace(":","")}/${i}/t2`));
-}
-
-function unlockScore(time,i){
-if(!isAdmin)return;
-remove(ref(db,`scrims/${time.replace(":","")}/${i}/score`));
-}
-
-function resetDay(){
-if(confirm("Reset entire day?"))remove(ref(db,"scrims"));
-}
+/* =============================
+   ADMIN
+============================= */
 
 function adminLogin(){
-if(prompt("Passcode:")==="011226"){
-isAdmin=true;
-document.getElementById("adminPanel").style.display="block";
-document.querySelectorAll(".admin-controls").forEach(el=>el.style.display="block");
+if(prompt("Passcode:") === "011226"){
+isAdmin = true;
+document.getElementById("adminPanel").style.display = "block";
+document.querySelectorAll(".admin-controls")
+.forEach(el=> el.style.display="block");
 alert("Admin mode activated");
 }
 }
+window.adminLogin = adminLogin;
 
-onValue(ref(db,"scrims"),snap=>{
-let data=snap.val()||{};
+function resetDay(){
+if(confirm("Reset entire day?")){
+db.ref("scrims").remove();
+}
+}
+window.resetDay = resetDay;
+
+/* =============================
+   BUILD TIME SLOTS
+============================= */
+
+function build(){
 times.forEach(time=>{
-let id=time.replace(":","");
-let slot=data[id]||{};
-let confirmed=0;
-let total=Object.keys(slot).length||5;
+const id = time.replace(":","");
+const details = document.createElement("details");
+
+details.innerHTML = `
+<summary>${time}
+<span id="count-${id}" style="font-size:.7rem;color:#aaa;">
+Available:5 | Confirmed:0
+</span>
+</summary>
+
+<div id="matches-${id}"></div>
+
+<div class="admin-controls" id="admin-time-${id}" style="display:none;text-align:center;margin:5px;">
+<button onclick="addSlot('${time}')">+ Slot</button>
+<button onclick="removeSlot('${time}')">- Slot</button>
+</div>
+`;
+
+container.appendChild(details);
+
+const matchContainer = document.getElementById(`matches-${id}`);
 
 for(let i=1;i<=5;i++){
-let match=slot[i]||{};
-let t1=document.getElementById(`${id}-${i}-t1`);
-let t2=document.getElementById(`${id}-${i}-t2`);
-if(t1)t1.value=match.t1||"";
-if(t2)t2.value=match.t2||"";
+createMatch(matchContainer,time,i);
+}
+});
+}
 
-if(match.t1&&match.t2)confirmed++;
+function createMatch(parent,time,index){
+
+const id = time.replace(":","");
+
+const div = document.createElement("div");
+div.className = "match-slot";
+div.id = `slot-${id}-${index}`;
+
+div.innerHTML = `
+<div class="vs-row">
+<input id="${id}-${index}-t1" placeholder="Team 1">
+<span>vs</span>
+<input id="${id}-${index}-t2" placeholder="Team 2">
+</div>
+
+<div class="score-row" id="score-ui-${id}-${index}">
+<select id="s1-${id}-${index}">
+<option value="">-</option>
+<option>2</option>
+<option>1</option>
+<option>0</option>
+<option>DQ</option>
+</select>
+-
+<select id="s2-${id}-${index}">
+<option value="">-</option>
+<option>2</option>
+<option>1</option>
+<option>0</option>
+<option>DQ</option>
+</select>
+<button id="ok-${id}-${index}" disabled>OK</button>
+</div>
+
+<div id="win-${id}-${index}" class="winner-tag"></div>
+
+<div class="admin-controls" id="admin-${id}-${index}" style="display:none;">
+<button onclick="unlockTeams('${time}',${index})">Unlock Teams</button>
+<button onclick="unlockScore('${time}',${index})">Unlock Score</button>
+</div>
+`;
+
+parent.appendChild(div);
+
+/* TEAM SAVE */
+
+document.getElementById(`${id}-${index}-t1`)
+.addEventListener("change",e=> saveTeam(time,index,"t1",e.target.value));
+
+document.getElementById(`${id}-${index}-t2`)
+.addEventListener("change",e=> saveTeam(time,index,"t2",e.target.value));
+
+/* SCORE CHECK */
+
+document.getElementById(`s1-${id}-${index}`)
+.addEventListener("change",()=> checkScore(id,index));
+
+document.getElementById(`s2-${id}-${index}`)
+.addEventListener("change",()=> checkScore(id,index));
+
+document.getElementById(`ok-${id}-${index}`)
+.addEventListener("click",()=> lockScore(time,index));
+}
+
+/* =============================
+   TEAM SAVE WITH TRANSACTION
+============================= */
+
+function saveTeam(time,index,pos,name){
+
+if(!confirm("Confirm team name? After confirming it will be locked.")) return;
+
+const id = time.replace(":","");
+const path = `scrims/${id}/${index}/${pos}`;
+
+db.ref(path).transaction(current=>{
+if(current && !isAdmin){
+alert("Slot already taken. Please refresh.");
+return;
+}
+return name;
+});
+}
+
+/* =============================
+   SCORE LOGIC
+============================= */
+
+function checkScore(id,index){
+const s1 = document.getElementById(`s1-${id}-${index}`).value;
+const s2 = document.getElementById(`s2-${id}-${index}`).value;
+
+document.getElementById(`ok-${id}-${index}`).disabled =
+(s1 === "" || s2 === "");
+}
+
+function determineWinner(t1,t2,s1,s2){
+if(s1 === "DQ") return t2;
+if(s2 === "DQ") return t1;
+if(parseInt(s1) > parseInt(s2)) return t1;
+if(parseInt(s2) > parseInt(s1)) return t2;
+return "Draw";
+}
+
+function lockScore(time,index){
+
+if(!confirm("Lock score? It cannot be modified unless admin unlocks.")) return;
+
+const id = time.replace(":","");
+
+const s1 = document.getElementById(`s1-${id}-${index}`).value;
+const s2 = document.getElementById(`s2-${id}-${index}`).value;
+
+db.ref(`scrims/${id}/${index}/score`)
+.set({ s1, s2, locked:true });
+}
+
+/* =============================
+   ADMIN UNLOCK
+============================= */
+
+function unlockTeams(time,index){
+if(!isAdmin) return;
+const id = time.replace(":","");
+db.ref(`scrims/${id}/${index}/t1`).remove();
+db.ref(`scrims/${id}/${index}/t2`).remove();
+}
+window.unlockTeams = unlockTeams;
+
+function unlockScore(time,index){
+if(!isAdmin) return;
+const id = time.replace(":","");
+db.ref(`scrims/${id}/${index}/score`).remove();
+}
+window.unlockScore = unlockScore;
+
+/* =============================
+   ADD / REMOVE SLOT
+============================= */
+
+function addSlot(time){
+if(!isAdmin) return;
+const id = time.replace(":","");
+const container = document.getElementById(`matches-${id}`);
+const next = container.children.length + 1;
+createMatch(container,time,next);
+}
+window.addSlot = addSlot;
+
+function removeSlot(time){
+if(!isAdmin) return;
+const id = time.replace(":","");
+const container = document.getElementById(`matches-${id}`);
+const last = container.children.length;
+if(last > 0){
+db.ref(`scrims/${id}/${last}`).remove();
+container.removeChild(container.lastChild);
+}
+}
+window.removeSlot = removeSlot;
+
+/* =============================
+   REAL-TIME SYNC
+============================= */
+
+db.ref("scrims").on("value",snap=>{
+
+const data = snap.val() || {};
+
+times.forEach(time=>{
+const id = time.replace(":","");
+const slot = data[id] || {};
+let confirmed = 0;
+
+Object.keys(slot).forEach(key=>{
+
+const match = slot[key];
+const t1Input = document.getElementById(`${id}-${key}-t1`);
+const t2Input = document.getElementById(`${id}-${key}-t2`);
+
+if(t1Input){
+t1Input.value = match.t1 || "";
+t1Input.disabled = !!match.t1;
+}
+
+if(t2Input){
+t2Input.value = match.t2 || "";
+t2Input.disabled = !!match.t2;
+}
+
+if(match.t1 && match.t2) confirmed++;
 
 if(match.score?.locked){
-let win=determineWinner(match.t1,match.t2,match.score.s1,match.score.s2);
-document.getElementById(`win-${id}-${i}`).innerText="Winner: "+win;
-}
-}
 
-document.getElementById(`count-${id}`).innerText=
-`Available:${5-confirmed} | Confirmed:${confirmed}`;
+const scoreUI = document.getElementById(`score-ui-${id}-${key}`);
+scoreUI.innerHTML = `
+Score: ${match.score.s1} - ${match.score.s2}
+<span style="font-size:1.1rem;">🔒</span>
+`;
+
+const win = determineWinner(match.t1,match.t2,match.score.s1,match.score.s2);
+
+const winArea = document.getElementById(`win-${id}-${key}`);
+if(winArea) winArea.innerText = "Winner: " + win;
+}
+});
+
+const count = document.getElementById(`count-${id}`);
+if(count){
+const totalSlots = document.getElementById(`matches-${id}`).children.length;
+count.innerText = `Available:${totalSlots-confirmed} | Confirmed:${confirmed}`;
+}
 });
 });
+
+/* =============================
+   INIT
+============================= */
 
 build();
 </script>
