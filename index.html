@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UNO x DEER Scrimmage Academy</title>
+
+<style>
+:root{--primary:#e63946;--bg:#121212;--card:#1f1f1f;}
+body{margin:0;font-family:Segoe UI;background:var(--bg);color:white;text-align:center;
+background-image:url('YOUR_LOGO_URL');background-size:40%;background-repeat:no-repeat;background-position:center;background-attachment:fixed;}
+.overlay{background:rgba(18,18,18,.92);min-height:100vh;padding:20px;}
+.header{display:flex;justify-content:space-around;align-items:center;margin-bottom:15px;}
+.header img{width:55px;height:55px;border-radius:50%;}
+.academy-logo{width:90px!important;height:90px!important;}
+.btn-main{background:var(--primary);border:none;padding:12px 25px;color:white;font-weight:bold;border-radius:6px;}
+.date-text{margin-top:10px;color:#ffcc00;font-weight:bold;}
+.info-box{background:var(--card);padding:15px;border-radius:8px;margin:15px auto;max-width:500px;font-size:.85rem;text-align:left;}
+.scrim-list{display:none;margin-top:20px;max-width:550px;margin-left:auto;margin-right:auto;}
+details{background:var(--card);margin-bottom:8px;border-radius:8px;border:1px solid #333;}
+summary{padding:15px;display:flex;justify-content:space-between;font-weight:bold;cursor:pointer;}
+.match-slot{background:#2a2a2a;margin:10px;padding:12px;border-radius:6px;border-left:4px solid var(--primary);}
+.vs-row{display:flex;justify-content:space-between;align-items:center;}
+.vs-row input{width:42%;background:#111;border:1px solid #444;color:white;padding:8px;border-radius:4px;}
+.score-row{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;}
+select{background:#111;color:white;border:1px solid #444;padding:5px;border-radius:4px;}
+.btn-ok{background:#28a745;border:none;color:white;padding:5px 12px;border-radius:4px;}
+.btn-ok:disabled{background:#555;}
+.winner-tag{margin-top:5px;color:#ffcc00;font-size:.85rem;font-weight:bold;}
+.footer-icons{margin-top:50px;font-size:1.8rem;letter-spacing:15px;cursor:pointer;opacity:.7;}
+.admin-area{display:none;margin-top:20px;padding:15px;border:1px dashed #ffcc00;border-radius:8px;}
+.admin-controls button{margin:5px;background:#444;color:white;border:none;padding:6px 10px;border-radius:4px;}
+</style>
+</head>
+
+<body>
+<div class="overlay">
+
+<div class="header">
+<img src="UNO_LOGO_URL">
+<div>
+<div>UNO x DEER Scrimmage Academy</div>
+<img src="ACADEMY_LOGO_URL" class="academy-logo">
+<div style="font-size:.75rem;">Owned by Seffi and Hannah</div>
+</div>
+<img src="DEER_LOGO_URL">
+</div>
+
+<button class="btn-main" onclick="toggleList()">View List</button>
+<div class="date-text" id="date"></div>
+
+<div class="info-box">
+🌟 POINTS SYSTEM 🌟<br><br>
+2-0 = 3pts | 1pt<br>
+2-1 = 3pts | 2pts<br>
+1-2 = 2pts | 3pts<br>
+DQ-2 = 0pt | 3pts<br>
+2-DQ = 3pts | 0pt<br><br>
+MONDAY-FRIDAY – Daily Scrim<br>
+SATURDAY – Tally of Points<br>
+SUNDAY – Bi-Weekly Tournament (Top 32)<br>
+February 15, 2026<br>
+March 1, 2026<br><br>
+PRIZES:<br>
+Champion – ₱1500 + e-cert<br>
+Runner-Up – ₱500 + e-cert<br>
+Semi – e-cert<br>
+Monthly 1st – ₱1000<br>
+</div>
+
+<div class="scrim-list" id="container"></div>
+
+<div class="footer-icons">
+<span>✡</span>
+<span onclick="adminLogin()">🔒</span>
+<span>🦌</span>
+</div>
+
+<div id="adminPanel" class="admin-area">
+<div>Admin Mode Active</div>
+<button onclick="resetDay()">Reset Daily List</button>
+</div>
+
+</div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+import{getDatabase,ref,onValue,runTransaction,set,remove}from"https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+const firebaseConfig={
+  apiKey: "AIzaSyBZ5p9HbxcdOZTX9cKpJuboajxqCk5kLkU",
+  authDomain: "uno-x-deer-scrim.firebaseapp.com",
+  databaseURL: "https://uno-x-deer-scrim-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "uno-x-deer-scrim",
+  storageBucket: "uno-x-deer-scrim.firebasestorage.app",
+  messagingSenderId: "553694902384",
+  appId: "1:553694902384:web:8608acf13b1044b8fadcb5"
+};
+const app=initializeApp(firebaseConfig);
+const db=getDatabase(app);
+
+let isAdmin=false;
+
+document.getElementById("date").innerText=
+new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+
+const times=["7:00PM","7:30PM","8:00PM","8:30PM","9:00PM","9:30PM","10:00PM","10:30PM","11:00PM","11:30PM"];
+const container=document.getElementById("container");
+
+function toggleList(){
+container.style.display=container.style.display==="block"?"none":"block";
+}
+
+function build(){
+times.forEach(time=>{
+let id=time.replace(":","");
+let html=`<details>
+<summary>${time}
+<span id="count-${id}" style="font-size:.7rem;color:#aaa;">Available:5 | Confirmed:0</span>
+</summary>
+<div id="matches-${id}"></div></details>`;
+container.innerHTML+=html;
+
+let mDiv=document.getElementById(`matches-${id}`);
+for(let i=1;i<=5;i++){
+createMatch(mDiv,id,time,i);
+}
+});
+}
+
+function createMatch(parent,id,time,i){
+let div=document.createElement("div");
+div.className="match-slot";
+div.innerHTML=`
+<div class="vs-row">
+<input id="${id}-${i}-t1" placeholder="Team 1">
+<span>vs</span>
+<input id="${id}-${i}-t2" placeholder="Team 2">
+</div>
+<div class="score-row">
+<select id="s1-${id}-${i}">
+<option value="">-</option><option>2</option><option>1</option><option>0</option><option>DQ</option>
+</select>
+-
+<select id="s2-${id}-${i}">
+<option value="">-</option><option>2</option><option>1</option><option>0</option><option>DQ</option>
+</select>
+<button id="ok-${id}-${i}" disabled>OK</button>
+</div>
+<div id="win-${id}-${i}" class="winner-tag"></div>
+<div class="admin-controls" id="admin-${id}-${i}" style="display:none;">
+<button onclick="unlockTeam('${time}',${i})">Unlock Teams</button>
+<button onclick="unlockScore('${time}',${i})">Unlock Score</button>
+</div>
+`;
+parent.appendChild(div);
+
+document.getElementById(`${id}-${i}-t1`).addEventListener("change",e=>saveTeam(time,i,"t1",e.target.value));
+document.getElementById(`${id}-${i}-t2`).addEventListener("change",e=>saveTeam(time,i,"t2",e.target.value));
+
+document.getElementById(`s1-${id}-${i}`).addEventListener("change",()=>checkScore(id,i));
+document.getElementById(`s2-${id}-${i}`).addEventListener("change",()=>checkScore(id,i));
+document.getElementById(`ok-${id}-${i}`).addEventListener("click",()=>lockScore(time,i));
+}
+
+function saveTeam(time,i,pos,name){
+if(!confirm("Confirm team name? After this it locks."))return;
+let path=`scrims/${time.replace(":","")}/${i}/${pos}`;
+runTransaction(ref(db,path),cur=>{
+if(!cur||isAdmin)return name;
+alert("Slot already taken. Refresh.");
+return;
+});
+}
+
+function checkScore(id,i){
+let s1=document.getElementById(`s1-${id}-${i}`).value;
+let s2=document.getElementById(`s2-${id}-${i}`).value;
+document.getElementById(`ok-${id}-${i}`).disabled=(s1===""||s2==="");
+}
+
+function determineWinner(t1,t2,s1,s2){
+if(s1==="DQ")return t2;
+if(s2==="DQ")return t1;
+if(parseInt(s1)>parseInt(s2))return t1;
+if(parseInt(s2)>parseInt(s1))return t2;
+return "Draw";
+}
+
+function lockScore(time,i){
+if(!confirm("Lock score?"))return;
+let id=time.replace(":","");
+let s1=document.getElementById(`s1-${id}-${i}`).value;
+let s2=document.getElementById(`s2-${id}-${i}`).value;
+set(ref(db,`scrims/${id}/${i}/score`),{s1,s2,locked:true});
+}
+
+function unlockTeam(time,i){
+if(!isAdmin)return;
+remove(ref(db,`scrims/${time.replace(":","")}/${i}/t1`));
+remove(ref(db,`scrims/${time.replace(":","")}/${i}/t2`));
+}
+
+function unlockScore(time,i){
+if(!isAdmin)return;
+remove(ref(db,`scrims/${time.replace(":","")}/${i}/score`));
+}
+
+function resetDay(){
+if(confirm("Reset entire day?"))remove(ref(db,"scrims"));
+}
+
+function adminLogin(){
+if(prompt("Passcode:")==="011226"){
+isAdmin=true;
+document.getElementById("adminPanel").style.display="block";
+document.querySelectorAll(".admin-controls").forEach(el=>el.style.display="block");
+alert("Admin mode activated");
+}
+}
+
+onValue(ref(db,"scrims"),snap=>{
+let data=snap.val()||{};
+times.forEach(time=>{
+let id=time.replace(":","");
+let slot=data[id]||{};
+let confirmed=0;
+let total=Object.keys(slot).length||5;
+
+for(let i=1;i<=5;i++){
+let match=slot[i]||{};
+let t1=document.getElementById(`${id}-${i}-t1`);
+let t2=document.getElementById(`${id}-${i}-t2`);
+if(t1)t1.value=match.t1||"";
+if(t2)t2.value=match.t2||"";
+
+if(match.t1&&match.t2)confirmed++;
+
+if(match.score?.locked){
+let win=determineWinner(match.t1,match.t2,match.score.s1,match.score.s2);
+document.getElementById(`win-${id}-${i}`).innerText="Winner: "+win;
+}
+}
+
+document.getElementById(`count-${id}`).innerText=
+`Available:${5-confirmed} | Confirmed:${confirmed}`;
+});
+});
+
+build();
+</script>
+</body>
+</html>
